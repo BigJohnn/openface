@@ -27,7 +27,7 @@ def getRep(bgrImg):
         raise Exception("Unable to load image/frame")
 
     rgbImg = cv2.cvtColor(bgrImg, cv2.COLOR_BGR2RGB)
-
+    # cv2.resize(rgbImg, [450, 450], rgbImg)
     if args.verbose:
         print("  + Original size: {}".format(rgbImg.shape))
     if args.verbose:
@@ -168,10 +168,10 @@ if __name__ == '__main__':
         type=int,
         default=0,
         help='Capture device. 0 for latop webcam and 1 for usb webcam')
-    # parser.add_argument('--width', type=int, default=640)
-    # parser.add_argument('--height', type=int, default=480)
-    parser.add_argument('--width', type=int, default=1280)
-    parser.add_argument('--height', type=int, default=800)
+    parser.add_argument('--width', type=int, default=640)
+    parser.add_argument('--height', type=int, default=480)
+    # parser.add_argument('--width', type=int, default=1280)
+    # parser.add_argument('--height', type=int, default=720)
     parser.add_argument('--scale', type=int, default=0.25)
     parser.add_argument('--threshold', type=float, default=0.5)
     parser.add_argument('--cuda', action='store_true')
@@ -186,11 +186,12 @@ if __name__ == '__main__':
         cuda=args.cuda)
 
     # Capture device. Usually 0 will be webcam and 1 will be usb cam.
-    video_capture = cv2.VideoCapture(args.captureDevice)
-    video_capture.set(3, args.width)
-    video_capture.set(4, args.height)
+    video_capture = cv2.VideoCapture()
+    video_capture.open("baby.mp4")
 
-    cv2.namedWindow('video', cv2.WINDOW_NORMAL)
+
+    # video_capture.set(3, args.width)
+    # video_capture.set(4, args.height)
 
     class Tracker:
 
@@ -218,7 +219,9 @@ if __name__ == '__main__':
 
     while True:
         ret, frame = video_capture.read()
-        frame = cv2.flip(frame, 1)
+        frame = cv2.resize(frame,(640,480))
+
+        # frame = cv2.flip(frame, 1)
         frameSmall = cv2.resize(frame, (int(args.width * args.scale),
                                         int(args.height * args.scale)))
 
@@ -269,19 +272,21 @@ if __name__ == '__main__':
                     del trackers[i]
                     continue
 
-        cSz = 450
+        cSz = 300
+
         sphere = np.copy(frame)
         sphere[0:cSz, 0:cSz, :] = draw(pts, clrs, cSz)
         alpha = 0.25
         beta = 1. - alpha
         cv2.putText(sphere, "CMU OpenFace", (50, 30),
                     cv2.FONT_HERSHEY_COMPLEX_SMALL, 2.,
-                    (0, 0, 0), 1, cv2.cv.CV_AA)
+                    (0, 0, 0), 1, cv2.LINE_AA)
         cv2.addWeighted(frame, alpha, sphere, beta, 0.0, frame)
         cv2.imshow('video', frame)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if cv2.waitKey(33) & 0xFF == ord('q'):
             break
+
 
     video_capture.release()
     cv2.destroyAllWindows()

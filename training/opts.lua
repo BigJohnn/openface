@@ -1,6 +1,6 @@
 local M = { }
 
--- http://stackoverflow.com/questions/6380820/get-containing-path-of-lua-file
+-- http://stackoverflow.com/questions/6380820/get-:containing-path-of-lua-file
 function script_path()
    local str = debug.getinfo(2, "S").source:sub(2)
    return str:match("(.*/)")
@@ -20,16 +20,14 @@ function M.parse(arg)
               'Directory to cache experiments and data.')
    cmd:option('-save', '', 'Directory to save experiment.')
    cmd:option('-data',
-              paths.concat(os.getenv('HOME'), 'openface', 'data',
-                           'casia-facescrub',
-                           'dlib-affine-sz:96'),
+              paths.concat(os.getenv('HOME'), 'openface', 'aligned'),
                            -- 'dlib-affine-224-split'),
               'Home of dataset. Images separated by identity.')
    cmd:option('-manualSeed', 2, 'Manually set RNG seed')
    cmd:option('-cuda', true, 'Use cuda.')
    cmd:option('-device', 1, 'Cuda device to use.')
    cmd:option('-nGPU',   1,  'Number of GPUs to use by default')
-   cmd:option('-cudnn', true, 'Convert the model to cudnn.')
+   cmd:option('-cudnn', false, 'Convert the model to cudnn.')
    cmd:option('-cudnn_bench', false, 'Run cudnn to choose fastest option. Increase memory usage')
 
    ------------- Data options ------------------------
