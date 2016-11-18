@@ -122,7 +122,7 @@ class TestVideo(object):
                     cv2.rectangle(frame, (l, t), (r, d), color=(0, 0, 255), thickness=4)
                     cv2.rectangle(frame_show, (int(l / compress_ratio), int(t / compress_ratio)),
                                   (int(r / compress_ratio), int(d / compress_ratio)),
-                                  color=(0, 0, 255), thickness=4)
+                                  color=(0, 0, 0), thickness=4)
                 if multiple:
                     print("Predict {} @ x={} with {:.2f} confidence.".format(person, bb, confidence))
                     if confidence<0.7:
@@ -150,4 +150,4 @@ class TestVideo(object):
             wrt.write(frame_show)
 
 if __name__ == '__main__':
-    TestVideo.test_predict_video(video_name='../data/ttnkh.flv', modeldir='../models/classifier10stars.pkl')
+    TestVideo.test_predict_video(video_name='../data/wumn.flv', modeldir='../models/classifier10stars.pkl')
