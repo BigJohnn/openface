@@ -1,3 +1,5 @@
+#!/usr/bin/env python2
+
 import os
 import cv2
 import openface
@@ -11,7 +13,7 @@ start = time.time()
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 from sklearn.svm import SVC
-from sklearn.grid_search import GridSearchCV
+# from sklearn.grid_search import GridSearchCV
 from sklearn.mixture import GMM
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -27,6 +29,8 @@ def getRep(bgrImg, multiple=True):
 
     rgbImg = cv2.cvtColor(bgrImg, cv2.COLOR_BGR2RGB)
 
+    # cv2.imshow("1",rgbImg)
+    # cv2.waitKey(1)
     if multiple:
         bbs = align.getAllFaceBoundingBoxes(rgbImg)
     else:
@@ -150,4 +154,4 @@ class TestVideo(object):
             wrt.write(frame_show)
 
 if __name__ == '__main__':
-    TestVideo.test_predict_video(video_name='../data/wumn.flv', modeldir='../models/classifier10stars.pkl')
+    TestVideo.test_predict_video(video_name='../data/xiaoao1501.mp4', modeldir='../data/stars10-600/rep/classifierGaussianNB.pkl')

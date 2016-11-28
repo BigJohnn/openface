@@ -1,7 +1,8 @@
 #-*- coding:utf-8 -*-
 import os,shutil
 import random
-
+import cv2
+import re
 from PIL import Image
 
 DATA_ROOT = '../Data/costars'
@@ -54,8 +55,31 @@ def random_choice(num):
             shutil.copy(os.path.join(TRAIN_SOURCE,clsdir,item),os.path.join(\
                         RANDOM_CHOICED_ROOT,clsdir,item))
 
+def colorclahe(img):
+    b,g,r = cv2.split(img)
+    clahe = cv2.createCLAHE(2,(10,10))
+    cb = clahe.apply(b)
+    cg = clahe.apply(g)
+    cr = clahe.apply(r)
+    return cv2.merge([cb,cg,cr])
+
+ALIGNED_REGEN = '../data/stars10-600/aligned-regen'
+ALIGNED = '../data/stars10-600/aligned'
+def regenerate():
+    if not os.path.exists(ALIGNED_REGEN):
+        os.mkdir(ALIGNED_REGEN)
+    for clsdir in os.listdir(ALIGNED):
+        if not re.search('\.t7', clsdir):
+            if not os.path.exists(ALIGNED_REGEN+'/'+clsdir):
+                os.mkdir(ALIGNED_REGEN+'/'+clsdir+'/')
+            for item in os.listdir(ALIGNED+'/'+clsdir):
+                img = cv2.imread(os.path.join(ALIGNED+'/'+clsdir,item))
+                cv2.imwrite(os.path.join(ALIGNED_REGEN+'/'+clsdir,item),colorclahe(img))
+
 if __name__ == '__main__':
     # random_shuffle()
-    random_choice(500)
+    regenerate()
+
+    # random_choice(500)
 
     pass

@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+#This script generate rotation, translation, scaling and affined version of an image.
 import cv2
 from PIL import Image
 from itertools import product
 import os
 import numpy as np
 
-DATA_ROOT = 'test'
+DATA_ROOT = '../data'
 DATA_AUG_POS_SHIFT_MIN = -2
 DATA_AUG_POS_SHIFT_MAX = 2
 DATA_AUG_SCALES = [0.9, 1.1]

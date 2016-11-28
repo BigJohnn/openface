@@ -164,7 +164,7 @@ def train(args):
 
     clf.fit(embeddings, labelsNum)
 
-    fName = "{}/classifier.pkl".format(args.workDir)
+    fName = "{}/classifier".format(args.workDir)+args.classifier+".pkl"
     print("Saving classifier to '{}'".format(fName))
     with open(fName, 'w') as f:
         pickle.dump((le, clf), f)

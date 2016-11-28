@@ -20,7 +20,7 @@ function batchRepresent()
          paths = {opt.data},
          loadSize = loadSize,
          sampleSize = loadSize,
-         split = 0,
+         split = 5,
          verbose = true
       }
       torch.save(cacheFile, dumpLoader)
