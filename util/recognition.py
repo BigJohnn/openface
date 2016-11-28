@@ -56,7 +56,7 @@ def getRep(bgrImg, multiple=True):
 
 class TestVideo(object):
     @classmethod
-    def test_predict_video(cls, video_name,modeldir,compress_ratio = 0.5,multiple=True):
+    def test_predict_video(cls, video_name,modeldir,compress_ratio = 0.9,multiple=True):
         with open(modeldir, 'r') as f:
             (le, clf) = pickle.load(f)
         cap = cv2.VideoCapture()
@@ -64,15 +64,16 @@ class TestVideo(object):
 
         # width = cap.get(0)
         # height = cap.get(1)
-        width = 1920
-        height = 1080
-        wrt = cv2.VideoWriter(video_name[:-4] + "_pred.avi", cv2.VideoWriter_fourcc(*'XVID'), 20, (width, height))
+        width = 480
+        height = 360
+        print video_name[:-4]
+        wrt = cv2.VideoWriter(video_name[:-4] + "_pred.avi", cv2.VideoWriter_fourcc(*'XVID'), 20, (width, height)) #image size must == (width, height)
 
         while cap.isOpened():
             ret, frame = cap.read()
             if frame is None:
                 break
-            frame_show = copy.deepcopy(frame)
+            frame_write = copy.deepcopy(frame)
             frame = cv2.resize(frame, (int(width*compress_ratio), int(height*compress_ratio)))
 
             reps = getRep(frame, multiple)
@@ -119,12 +120,12 @@ class TestVideo(object):
 
                 if confidence<0.7:
                     cv2.rectangle(frame, (l, t), (r, d), color=(255, 255, 0), thickness=4)
-                    cv2.rectangle(frame_show, (int(l / compress_ratio), int(t / compress_ratio)),
+                    cv2.rectangle(frame_write, (int(l / compress_ratio), int(t / compress_ratio)),
                                   (int(r / compress_ratio), int(d / compress_ratio)),
                                   color=(255, 255, 0), thickness=4)
                 else:
                     cv2.rectangle(frame, (l, t), (r, d), color=(0, 0, 255), thickness=4)
-                    cv2.rectangle(frame_show, (int(l / compress_ratio), int(t / compress_ratio)),
+                    cv2.rectangle(frame_write, (int(l / compress_ratio), int(t / compress_ratio)),
                                   (int(r / compress_ratio), int(d / compress_ratio)),
                                   color=(0, 0, 0), thickness=4)
                 if multiple:
@@ -133,25 +134,25 @@ class TestVideo(object):
                         cv2.putText(frame, "unknow.".format(person, confidence),
                                     (bb.center().x, bb.center().y), \
                                     cv2.FONT_HERSHEY_PLAIN, 1.1, (255, 0, 0), 2)
-                        cv2.putText(frame_show, "unknow.".format(person, confidence),
+                        cv2.putText(frame_write, "unknow.".format(person, confidence),
                                     (int(bb.center().x / compress_ratio), int(bb.center().y / compress_ratio)), \
-                                    cv2.FONT_HERSHEY_PLAIN, 1.1, (255, 0, 0), 2)
+                                    cv2.FONT_HERSHEY_PLAIN, 1.1/(1+compress_ratio), (255, 0, 0), int(2/(1+compress_ratio)))
                     else:
                         cv2.putText(frame, "{} @  {:.2f} confidence.".format(person,confidence),
                                     (bb.center().x,bb.center().y),\
                                     cv2.FONT_HERSHEY_PLAIN, 1.1, (0, 255, 255), 2)
-                        cv2.putText(frame_show, "{} @  {:.2f} confidence.".format(person, confidence),
+                        cv2.putText(frame_write, "{} @  {:.2f} confidence.".format(person, confidence),
                                     (int(bb.center().x/compress_ratio), int(bb.center().y/compress_ratio)), \
-                                    cv2.FONT_HERSHEY_PLAIN, 1.1, (0, 255, 255), 2)
+                                    cv2.FONT_HERSHEY_PLAIN, 1.1/(1+compress_ratio), (0, 255, 255), int(2/(1+compress_ratio)))
                 else:
                     print("Predict {} with {:.2f} confidence.".format(person, confidence))
                 if isinstance(clf, LinearRegression):
                     dist = np.linalg.norm(rep - clf.means_[maxI])
                     print("  + Distance from the mean: {}".format(dist))
 
-                cv2.imshow("1", frame)
-                cv2.waitKey(1)
-            wrt.write(frame_show)
+               # cv2.imshow("1", frame)
+               # cv2.waitKey(1)
+            wrt.write(frame_write)
 
 if __name__ == '__main__':
-    TestVideo.test_predict_video(video_name='../data/xiaoao1501.mp4', modeldir='../data/stars10-600/rep/classifierGaussianNB.pkl')
+    TestVideo.test_predict_video(video_name='../data/xiaoao1501.avi', modeldir='../data/stars10-600/rep/classifierGaussianNB.pkl')

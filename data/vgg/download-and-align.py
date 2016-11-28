@@ -62,7 +62,9 @@ for person in os.listdir(args.txt):
         contents = f.readlines()
 
     for line in contents:
-        id, uid, url, l, t, r, b, pose, detection, curation = line.split()
+        # id, uid, url, l, t, r, b, pose, detection, curation = line.split()
+        # l, t, r, b = [int(float(x)) for x in [l, t, r, b]]
+        id, url, l, t, r, b, pose, detection, curation = line.split()
         l, t, r, b = [int(float(x)) for x in [l, t, r, b]]
         # if int(curation) == 1:
         jobs.append((person[:-4], url, (l, t, r, b)))

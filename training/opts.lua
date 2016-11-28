@@ -26,7 +26,7 @@ function M.parse(arg)
    cmd:option('-manualSeed', 2, 'Manually set RNG seed')
    cmd:option('-cuda', true, 'Use cuda.')
    cmd:option('-device', 1, 'Cuda device to use.')
-   cmd:option('-nGPU',   1,  'Number of GPUs to use by default')
+   cmd:option('-nGPU',   2,  'Number of GPUs to use by default')
    cmd:option('-cudnn', false, 'Convert the model to cudnn.')
    cmd:option('-cudnn_bench', false, 'Run cudnn to choose fastest option. Increase memory usage')
 
