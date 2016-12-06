@@ -10,6 +10,7 @@ import copy
 import numpy as np
 import pickle
 import time
+from scipy import misc
 # from sklearn.pipeline import Pipeline
 # from sklearn.preprocessing import LabelEncoder
 # from sklearn.svm import SVC
@@ -82,9 +83,27 @@ class Compare(object):
         nrof_samples = len(init_images)
         img_list = [None] * nrof_samples
         for i in range(nrof_samples):
-            init_images[i] = cv2.resize(init_images[i], (self.image_size, self.image_size))
+            # init_images[i] = cv2.resize(init_images[i], (self.image_size, self.image_size))
+            #
+            # pre_whitened = self.__pre_whiten(init_images[i])
 
-            pre_whitened = self.__pre_whiten(init_images[i])
+            img_size = np.asarray(init_images[i].shape)[0:2]
+            bounding_boxes, _ = detect_face.detect_face(init_images[i], minsize,
+                                                        self.__pnet, self.__rnet, self.__onet,
+                                                        threshold, factor)
+            # print (bounding_boxes.shape)
+            if np.size(bounding_boxes) == 0:
+                det = np.squeeze(np.array([0,0,img_size[1],img_size[0]]))
+            else:
+                det = np.squeeze(bounding_boxes[0, 0:4])
+            bb = np.zeros(4, dtype=np.int32)
+            bb[0] = np.maximum(det[0] - self.margin / 2, 0)
+            bb[1] = np.maximum(det[1] - self.margin / 2, 0)
+            bb[2] = np.minimum(det[2] + self.margin / 2, img_size[1])
+            bb[3] = np.minimum(det[3] + self.margin / 2, img_size[0])
+            cropped = init_images[i][bb[1]:bb[3], bb[0]:bb[2], :]
+            aligned = misc.imresize(cropped, (self.image_size, self.image_size), interp='bilinear')
+            pre_whitened = self.__pre_whiten(aligned)
             img_list[i] = pre_whitened
         images = np.stack(img_list)
         t02 = time.clock()
@@ -233,10 +252,10 @@ class TestVideo(object):
                 predictions = clf.predict_proba(rep).ravel()
                 maxI = np.argmax(predictions)
                 person = le.inverse_transform(maxI)
-                distance = predictions[maxI]
+                confidence = predictions[maxI]
 
 
-                if distance<0.7:
+                if confidence<0.7:
                     cv2.rectangle(frame, (l, t), (r, d), color=(255, 255, 0), thickness=4)
                     cv2.rectangle(frame_write, (int(l / compress_ratio), int(t / compress_ratio)),
                                   (int(r / compress_ratio), int(d / compress_ratio)),
@@ -247,24 +266,24 @@ class TestVideo(object):
                                   (int(r / compress_ratio), int(d / compress_ratio)),
                                   color=(0, 0, 0), thickness=4)
                 if multiple:
-                    print("Predict {} @ x={} with {:.2f} distance.".format(person, bb, distance))
-                    if distance<0.7:
-                        cv2.putText(frame, "unknow.".format(person, distance),
+                    print("Predict {} @ x={} with {:.2f} confidence.".format(person, bb, confidence))
+                    if confidence<0.7:
+                        cv2.putText(frame, "unknow.".format(person, confidence),
                                     (bb.center().x, bb.center().y), \
                                     cv2.FONT_HERSHEY_PLAIN, 1.1, (255, 0, 0), 2)
-                        cv2.putText(frame_write, "unknow.".format(person, distance),
+                        cv2.putText(frame_write, "unknow.".format(person, confidence),
 
                                     (int(bb.center().x / compress_ratio), int(bb.center().y / compress_ratio)), \
                                     cv2.FONT_HERSHEY_PLAIN, 1.1/(1+compress_ratio), (255, 0, 0), int(2/(1+compress_ratio)))
                     else:
-                        cv2.putText(frame, "{} @  {:.2f} distance.".format(person,distance),
+                        cv2.putText(frame, "{} @  {:.2f} confidence.".format(person,confidence),
                                     (bb.center().x,bb.center().y),\
                                     cv2.FONT_HERSHEY_PLAIN, 1.1, (0, 255, 255), 2)
-                        cv2.putText(frame_write, "{} @  {:.2f} distance.".format(person, distance),
+                        cv2.putText(frame_write, "{} @  {:.2f} confidence.".format(person, confidence),
                                     (int(bb.center().x/compress_ratio), int(bb.center().y/compress_ratio)), \
                                     cv2.FONT_HERSHEY_PLAIN, 1.1/(1+compress_ratio), (0, 255, 255), int(2/(1+compress_ratio)))
                 else:
-                    print("Predict {} with {:.2f} distance.".format(person, distance))
+                    print("Predict {} with {:.2f} confidence.".format(person, confidence))
                 if isinstance(clf, LinearRegression):
                     dist = np.linalg.norm(rep - clf.means_[maxI])
                     print("  + Distance from the mean: {}".format(dist))
@@ -330,13 +349,14 @@ class TestVideo(object):
                     d = height - 1
                 else:
                     d = bb.bottom()
-                roi = frame[l:r,t:d]
+                roi = frame[t:d,l:r]
                 if (roi.shape[0]<=0) or (roi.shape[1]<=0):
                     print (l,r,t,d)
                     continue
                 # print(roi.shape)
                 roi = cv2.resize(roi,(imgDim,imgDim))
                 cv2.imshow('roi', roi)
+                cv2.waitKey(1)
                 for iter,item in enumerate(canonical_imgs):
                     canonical_imgs[iter].dist = cmp.eval_dist(roi, item.src)
 
@@ -345,7 +365,9 @@ class TestVideo(object):
 
                 distance = canonical_imgs[0].dist
                 person = canonical_imgs[0].name
-                if distance < 0.7:
+
+                thresh = 1.01
+                if distance < thresh:
                     cv2.rectangle(frame, (l, t), (r, d), color=(255, 255, 0), thickness=4)
                     cv2.rectangle(frame_write, (int(l / compress_ratio), int(t / compress_ratio)),
                                   (int(r / compress_ratio), int(d / compress_ratio)),
@@ -356,7 +378,7 @@ class TestVideo(object):
                                   (int(r / compress_ratio), int(d / compress_ratio)),
                                   color=(0, 0, 0), thickness=4)
                 print("Predict {} @ x={} with {:.2f} distance.".format(person, bb, distance))
-                if distance > 0.7:
+                if distance > thresh:
                     cv2.putText(frame, "unknow.".format(person, distance),
                                 (bb.center().x, bb.center().y), \
                                 cv2.FONT_HERSHEY_PLAIN, 1.1, (255, 0, 0), 2)
@@ -383,7 +405,7 @@ class TestVideo(object):
 
 
 if __name__ == '__main__':
-    # TestVideo.test_predict_video(video_name='../data/xiaoao1501.avi', modeldir='../data/stars10-600/rep/classifierGaussianNB.pkl')
+    TestVideo.test_predict_video(video_name='../data/xiaoao1501.avi', modeldir='../data/stars10-600/rep/classifierGaussianNB.pkl')
     # I = cv2.imread('../data/stars10/singles/baby.jpg')
     #
     # x = 'dsds'
@@ -391,16 +413,17 @@ if __name__ == '__main__':
     # dst = cv2.resize(I,(100,100))
     # cv2.imshow('1',dst)
     # cv2.waitKey()
-    start = time.clock()
-    cp = Compare('compare/models', image_size=160, margin=44, gpu_memory_fraction=0.6)
-    end = time.clock()
-    print ('init time',end-start,'s')
-    images = []
-    pref = '../data/stars10/sinalin'
-    for dir in os.listdir(pref):
-        im = image()
-        im.src = cv2.imread(os.path.join(pref, dir))
-        im.name = dir.split('.')[0]
-        images.append(im)
 
-    TestVideo.cmp_predict_video(video_name='../data/xiaoao1501.avi', cmp = cp, canonical_imgs=images, multiple=True)
+    # start = time.clock()
+    # cp = Compare('compare/models', image_size=160, margin=44, gpu_memory_fraction=0.6)
+    # end = time.clock()
+    # print ('init time',end-start,'s')
+    # images = []
+    # pref = '../data/stars10/sinalin'
+    # for dir in os.listdir(pref):
+    #     im = image()
+    #     im.src = cv2.imread(os.path.join(pref, dir))
+    #     im.name = dir.split('.')[0]
+    #     images.append(im)
+    #
+    # TestVideo.cmp_predict_video(video_name='../data/xiaoao1501.avi', cmp = cp, canonical_imgs=images, multiple=True)
