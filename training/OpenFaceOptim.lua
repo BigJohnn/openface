@@ -121,7 +121,7 @@ function OpenFaceOptim:optimizeTriplet(optimMethod, inputs, output,
   gradient_all = torch.Tensor(numImages,output[1]:size(2)):type(inputs:type())
   gradient_all:zero()
   --get all gradient for each example
-  for i=1,table.getn(mapper) do
+  for i=1,#(mapper) do
       gradient_all[mapper[i][1]]:add(df_do[1][i])
       gradient_all[mapper[i][2]]:add(df_do[2][i])
       gradient_all[mapper[i][3]]:add(df_do[3][i])

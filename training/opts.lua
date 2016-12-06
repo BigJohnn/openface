@@ -18,36 +18,37 @@ function M.parse(arg)
    cmd:option('-cache',
               paths.concat(script_path(), 'work'),
               'Directory to cache experiments and data.')
-   cmd:option('-save', '', 'Directory to save experiment.')
+   cmd:option('-save', paths.concat(script_path(), 'experiment'), 'Directory to save experiment.')
    cmd:option('-data',
-              paths.concat(os.getenv('HOME'), 'openface', 'aligned'),
+              paths.concat(os.getenv('HOME'), 'openface', 'data', 'stars10-600', 'aligned-224'),
                            -- 'dlib-affine-224-split'),
               'Home of dataset. Images separated by identity.')
-   cmd:option('-manualSeed', 2, 'Manually set RNG seed')
+   cmd:option('-manualSeed', 5, 'Manually set RNG seed')
    cmd:option('-cuda', true, 'Use cuda.')
-   cmd:option('-device', 1, 'Cuda device to use.')
-   cmd:option('-nGPU',   2,  'Number of GPUs to use by default')
-   cmd:option('-cudnn', false, 'Convert the model to cudnn.')
-   cmd:option('-cudnn_bench', false, 'Run cudnn to choose fastest option. Increase memory usage')
+   cmd:option('-device', 2, 'Cuda device to use.')
+  -- cmd:option('-device', 2, 'Cuda device to use.')
+   cmd:option('-nGPU',   1,  'Number of GPUs to use by default')
+   cmd:option('-cudnn', true, 'Convert the model to cudnn.')
+   cmd:option('-cudnn_bench', true, 'Run cudnn to choose fastest option. Increase memory usage')
 
    ------------- Data options ------------------------
    cmd:option('-nDonkeys', 2, 'number of donkeys to initialize (data loading threads)')
 
    ------------- Training options --------------------
    cmd:option('-nEpochs', 1000, 'Number of total epochs to run')
-   cmd:option('-epochSize', 250, 'Number of batches per epoch')
+   cmd:option('-epochSize', 50, 'Number of batches per epoch')
    cmd:option('-epochNumber', 1, 'Manual epoch number (useful on restarts)')
    -- GPU memory usage depends on peoplePerBatch and imagesPerPerson.
-   cmd:option('-peoplePerBatch', 15, 'Number of people to sample in each mini-batch.')
-   cmd:option('-imagesPerPerson', 20, 'Number of images to sample per person in each mini-batch.')
-   cmd:option('-testing', true, 'Test with the LFW.')
+   cmd:option('-peoplePerBatch', 5, 'Number of people to sample in each mini-batch.') --default is 15
+   cmd:option('-imagesPerPerson',15, 'Number of images to sample per person in each mini-batch.')
+   cmd:option('-testing', false, 'Test with the LFW.')
    cmd:option('-testBatchSize', 800, 'Batch size for testing.')
-   cmd:option('-lfwDir', '../data/lfw/aligned', 'LFW aligned image directory for testing.')
+   cmd:option('-lfwDir', '../data/lfw/align', 'LFW aligned image directory for testing.')
 
    ---------- Model options ----------------------------------
    cmd:option('-retrain', 'none', 'provide path to model to retrain with')
-   cmd:option('-modelDef', '../models/openface/nn4.def.lua', 'path to model definiton')
-   cmd:option('-imgDim', 96, 'Image dimension. nn2=224, nn4=96')
+   cmd:option('-modelDef', '../models/openface/nn2.def.lua', 'path to model definiton')
+   cmd:option('-imgDim', 224, 'Image dimension. nn2=224, nn4=96')
    cmd:option('-embSize', 128, 'size of embedding from model')
    cmd:option('-alpha', 0.2, 'margin in TripletLoss')
    cmd:text()

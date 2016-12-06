@@ -9,6 +9,7 @@
 --
 local Threads = require 'threads'
 
+print('2')
 -- This script contains the logic to create K threads for parallel data-loading.
 -- For the data-loading details, look at donkey.lua
 -------------------------------------------------------------------------------

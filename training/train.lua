@@ -194,8 +194,9 @@ function trainBatch(inputsThread, numPerClassThread)
         -- Use only non-random triplets.
         -- Random triples (which are beyond the margin) will just produce gradient = 0,
         -- so the average gradient will decrease.
-        if table.getn(allNeg) ~= 0 then
-          selNegIdx = allNeg[math.random (table.getn(allNeg))]
+        --if #(allNeg) ~= 0 then
+	if #allNeg ~= 0 then
+          selNegIdx = allNeg[math.random (#allNeg)]
           -- Add the embeding of each example.
           table.insert(as_table,embeddings[aIdx])
           table.insert(ps_table,embeddings[pIdx])
@@ -215,7 +216,7 @@ function trainBatch(inputsThread, numPerClassThread)
     embStartIdx = embStartIdx + n
   end
   assert(embStartIdx - 1 == numImages)
-  local nTripsFound = table.getn(as_table)
+  local nTripsFound = #(as_table)
   print(('  + (nTrips, nTripsFound) = (%d, %d)'):format(numTrips, nTripsFound))
 
   if nTripsFound == 0 then
@@ -223,9 +224,9 @@ function trainBatch(inputsThread, numPerClassThread)
      return
   end
 
-  local as = torch.concat(as_table):view(table.getn(as_table), opt.embSize)
-  local ps = torch.concat(ps_table):view(table.getn(ps_table), opt.embSize)
-  local ns = torch.concat(ns_table):view(table.getn(ns_table), opt.embSize)
+  local as = torch.concat(as_table):view(#(as_table), opt.embSize)
+  local ps = torch.concat(ps_table):view(#(ps_table), opt.embSize)
+  local ns = torch.concat(ns_table):view(#(ns_table), opt.embSize)
   
   local apn
   if opt.cuda then
