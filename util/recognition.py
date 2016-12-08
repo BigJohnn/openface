@@ -10,6 +10,7 @@ import copy
 import numpy as np
 import pickle
 import time
+import re
 from scipy import misc
 # from sklearn.pipeline import Pipeline
 # from sklearn.preprocessing import LabelEncoder
@@ -197,13 +198,14 @@ class TestVideo(object):
         cap = cv2.VideoCapture()
         cap.open(video_name)
 
-        # width = cap.get(0)
-        # height = cap.get(1)
-        width = 480
-        height = 360
+        width = cap.get(0)
+        height = cap.get(1)
+        width = 1104
+        height = 622
         # print video_name[:-4]
         wrt = cv2.VideoWriter(video_name[:-4] + "_pred.avi", cv2.VideoWriter_fourcc(*'XVID'), 20, (width, height)) #image size must == (width, height)
 
+        positive_clss = 'baby ch cqn dc fbb hg hjh lxr md wzl'
         while cap.isOpened():
 
             ret, frame = cap.read()
@@ -254,8 +256,8 @@ class TestVideo(object):
                 person = le.inverse_transform(maxI)
                 confidence = predictions[maxI]
 
-
-                if confidence<0.7:
+                thresh = 0.7
+                if confidence<thresh:
                     cv2.rectangle(frame, (l, t), (r, d), color=(255, 255, 0), thickness=4)
                     cv2.rectangle(frame_write, (int(l / compress_ratio), int(t / compress_ratio)),
                                   (int(r / compress_ratio), int(d / compress_ratio)),
@@ -267,7 +269,7 @@ class TestVideo(object):
                                   color=(0, 0, 0), thickness=4)
                 if multiple:
                     print("Predict {} @ x={} with {:.2f} confidence.".format(person, bb, confidence))
-                    if confidence<0.7:
+                    if confidence<thresh or not re.search(person,positive_clss):
                         cv2.putText(frame, "unknow.".format(person, confidence),
                                     (bb.center().x, bb.center().y), \
                                     cv2.FONT_HERSHEY_PLAIN, 1.1, (255, 0, 0), 2)
@@ -288,11 +290,11 @@ class TestVideo(object):
                     dist = np.linalg.norm(rep - clf.means_[maxI])
                     print("  + Distance from the mean: {}".format(dist))
 
-               # cv2.imshow("1", frame)
-               # cv2.waitKey(1)
+                cv2.imshow("1", frame)
+                cv2.waitKey(1)
             wrt.write(frame_write)
             t02 = time.clock()
-            # print t02 - t01
+            # print (t02 - t01)
 
     @classmethod
     def cmp_predict_video(cls, video_name, cmp, canonical_imgs, compress_ratio=0.9, multiple=True):
@@ -403,9 +405,73 @@ class TestVideo(object):
             t02 = time.clock()
             print (t02 - t01)
 
+    @classmethod
+    def predict_pn(cls, modeldir, posisampledir, negasampledir):
+        with open(modeldir, 'r') as f:
+            (le, clf) = pickle.load(f)
+
+        positive_clss = 'baby ch cqn dc fbb hg hjh lxr md wzl'
+        # # thresh = 0.7
+        # tpr = []
+        tpr = []
+        fpr = []
+        accuracy = []
+        for thresh in range(10):
+            thresh = thresh / 10.0
+            p = 0
+            n = 0
+            tp = 0
+            fp = 0
+            tn = 0
+            fn = 0
+
+            for dir in os.listdir(posisampledir):
+                if re.search('\.',dir):
+                    continue
+                p+=1
+                for item in os.listdir(os.path.join(posisampledir,dir)):
+                    img = cv2.imread(os.path.join(posisampledir,dir,item))
+                    rep = net.forward(img)
+                    predictions = clf.predict_proba(rep).ravel()
+                    maxI = np.argmax(predictions)
+                    person = le.inverse_transform(maxI)
+                    confidence = predictions[maxI]
+
+                    if confidence>thresh and re.search(person,positive_clss):
+                        tp+=1
+                    else:
+                        fn+=1
+                print ('p:',p)
+
+            for dir in os.listdir(negasampledir):
+                if re.search('\.',dir):
+                    continue
+                n+=1
+                for item in os.listdir(os.path.join(negasampledir,dir)):
+                    img = cv2.imread(os.path.join(negasampledir, dir, item))
+                    rep = net.forward(img)
+                    rep.reshape(-1,1)
+                    predictions = clf.predict_proba(rep).ravel()
+                    maxI = np.argmax(predictions)
+                    person = le.inverse_transform(maxI)
+                    confidence = predictions[maxI]
+
+                    if confidence > thresh and re.search(person,positive_clss):
+                        fp += 1
+                    else:
+                        tn += 1
+                print ('n:',n)
+        tpr.append(tp/(tp+fn))
+        fpr.append(fp/(fp+tn))
+        accuracy.append((tp+tn)/(p+n))
+
+        print ('tpr:',tpr,'fpr:',fpr,'accuracy:',accuracy)
+
 
 if __name__ == '__main__':
-    TestVideo.test_predict_video(video_name='../data/xiaoao1501.avi', modeldir='../data/stars10-600/rep/classifierGaussianNB.pkl')
+    # TestVideo.test_predict_video(video_name='../data/bpb150515.flv', modeldir='../data/stars10mix/rep/classifierLinearSvm23a900.pkl',compress_ratio=0.6)
+
+    TestVideo.predict_pn('../data/stars10mix/rep/classifierLinearSvm23a900.pkl','../data/stars10-600/aligned','../aligned-11-16')
     # I = cv2.imread('../data/stars10/singles/baby.jpg')
     #
     # x = 'dsds'

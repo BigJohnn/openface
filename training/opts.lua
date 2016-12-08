@@ -20,7 +20,7 @@ function M.parse(arg)
               'Directory to cache experiments and data.')
    cmd:option('-save', paths.concat(script_path(), 'experiment'), 'Directory to save experiment.')
    cmd:option('-data',
-              paths.concat(os.getenv('HOME'), 'openface', 'data', 'stars10-600', 'aligned-224'),
+              paths.concat(os.getenv('HOME'), 'openface', 'data', 'vgg', 'aligned224'),
                            -- 'dlib-affine-224-split'),
               'Home of dataset. Images separated by identity.')
    cmd:option('-manualSeed', 5, 'Manually set RNG seed')
