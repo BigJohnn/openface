@@ -32,7 +32,7 @@ function M.parse(arg)
    cmd:option('-cudnn_bench', true, 'Run cudnn to choose fastest option. Increase memory usage')
 
    ------------- Data options ------------------------
-   cmd:option('-nDonkeys', 2, 'number of donkeys to initialize (data loading threads)')
+   cmd:option('-nDonkeys', 1, 'number of donkeys to initialize (data loading threads)')
 
    ------------- Training options --------------------
    cmd:option('-nEpochs', 1000, 'Number of total epochs to run')

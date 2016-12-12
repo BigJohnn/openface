@@ -432,6 +432,7 @@ class TestVideo(object):
                 for item in os.listdir(os.path.join(posisampledir,dir)):
                     img = cv2.imread(os.path.join(posisampledir,dir,item))
                     rep = net.forward(img)
+                    rep.reshape(1,-1)
                     predictions = clf.predict_proba(rep).ravel()
                     maxI = np.argmax(predictions)
                     person = le.inverse_transform(maxI)

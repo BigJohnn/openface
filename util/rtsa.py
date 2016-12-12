@@ -16,7 +16,7 @@ DATA_AUG_ROT_MAX = 15
 divs = range(10,20,4)
 
 def aug_pos(im, name, prefix):
-    rect = {'cx':im.width/2,'cy':im.height/2,'wid':im.width*4/5, 'hgt':im.height*4/5}
+    rect = {'cx':im.size[0]/2,'cy':im.size[1]/2,'wid':im.size[0]*4/5, 'hgt':im.size[1]*4/5}
     for sx, sy in product(
             range(DATA_AUG_POS_SHIFT_MIN, DATA_AUG_POS_SHIFT_MAX),
             range(DATA_AUG_POS_SHIFT_MIN, DATA_AUG_POS_SHIFT_MAX)):
@@ -31,7 +31,7 @@ def aug_pos(im, name, prefix):
     pass
 
 def aug_scale(im, name, prefix):
-    rect = {'cx':im.width/2,'cy':im.height/2,'wid':im.width*4/5, 'hgt':im.height*4/5}
+    rect = {'cx':im.size[0]/2,'cy':im.size[1]/2,'wid':im.size[0]*4/5, 'hgt':im.size[1]*4/5}
     for s in DATA_AUG_SCALES:
         w = int(rect['wid'] * s)
         h = int(rect['hgt'] * s)
@@ -42,7 +42,7 @@ def aug_scale(im, name, prefix):
     pass
 
 def aug_rot(im, name, prefix):
-    rect = {'cx':im.width/2,'cy':im.height/2,'wid':im.width*4/5, 'hgt':im.height*4/5}
+    rect = {'cx':im.size[0]/2,'cy':im.size[1]/2,'wid':im.size[0]*4/5, 'hgt':im.size[1]*4/5}
     for r in range(DATA_AUG_ROT_MIN, DATA_AUG_ROT_MAX):
         rotated_im = im.rotate(r)
         cropped_im = rotated_im.crop(
@@ -75,17 +75,44 @@ def aug_affine(img, name, prefix):
         cv2.imwrite(os.path.join(prefix, '_'.join([name, aug_affine_suffix]) + '.jpg'), AffinedImg)
     pass
 
-if __name__ == '__main__':
-    for dir in os.listdir(DATA_ROOT):
-        pref = os.path.join(DATA_ROOT, dir)
-        for item in os.listdir(os.path.join(DATA_ROOT,dir)):
-            im = Image.open(os.path.join(pref,item))
-            img = cv2.imread(os.path.join(pref, item))
-            fullname = item.split('.')[0]
-            name = fullname.split('_')[0]
-            aug_pos(im,name, pref)
-            aug_rot(im,name, pref)
-            aug_scale(im,name, pref)
-            aug_affine(img, name, pref)
-            pass
-    pass
+def aug_gaussianblur(img, name, prefix):
+    for sigma in [1.5,2.5,3.5,4.5]:
+        kernel_size = (5, 5);
+
+        GBimg = cv2.GaussianBlur(img, kernel_size, sigma);
+        aug_GB_suffix = 'GaussianBlur_' + str(kernel_size[0])+ '_'+ str(sigma)
+        cv2.imwrite(os.path.join(prefix, '_'.join([name, aug_GB_suffix]) + '.jpg'), GBimg)
+
+
+
+def data_aug(data_root):
+    # for dir in os.listdir(data_root):
+    pref = data_root
+    for item in os.listdir(data_root):
+        # print os.path.join(pref,item)
+        im = Image.open(os.path.join(pref,item))
+        # print im,im.size[0],im.size[1]
+        img = cv2.imread(os.path.join(pref, item))
+        fullname = item.split('.')[0]
+        name = fullname.split('_')[0]
+        aug_pos(im,name, pref)
+        aug_rot(im,name, pref)
+        aug_scale(im,name, pref)
+        aug_affine(img, name, pref)
+        aug_gaussianblur(img,name, pref)
+
+# if __name__ == '__main__':
+#     for dir in os.listdir(DATA_ROOT):
+#         pref = os.path.join(DATA_ROOT, dir)
+#         for item in os.listdir(os.path.join(DATA_ROOT,dir)):
+#             im = Image.open(os.path.join(pref,item))
+#             img = cv2.imread(os.path.join(pref, item))
+#             fullname = item.split('.')[0]
+#             name = fullname.split('_')[0]
+#             aug_pos(im,name, pref)
+#             aug_rot(im,name, pref)
+#             aug_scale(im,name, pref)
+#             aug_affine(img, name, pref)
+#             aug_gaussianblur(img,name, pref)
+#             pass
+#     pass

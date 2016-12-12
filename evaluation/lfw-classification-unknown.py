@@ -183,6 +183,7 @@ def inferFromTest(args):
     for clfChoice in clfChoices:
         print "==============="
         print "Using the classifier: " + clfChoice
+        print args.featureFolder
         with open(os.path.join(args.featureFolder[0], clfChoice + ".pkl"), 'r') as f_clf:
             (le, clf) = pickle.load(f_clf)
 
@@ -415,7 +416,7 @@ if __name__ == '__main__':
         help="Path to Torch network model.",
         default=os.path.join(
             openfaceModelDir,
-            'nn4.small2.v1.t7'))
+            'nn4.v2.t7'))
     parser.add_argument('--imgDim', type=int,
                         help="Default image dimension.", default=96)
     parser.add_argument('--cuda', action='store_true')
@@ -438,7 +439,8 @@ if __name__ == '__main__':
     trainParser.add_argument(
         'workDir',
         type=str,
-        help="The input work directory containing 'reps.csv' and 'labels.csv'. Obtained from aligning a directory with 'align-dlib' and getting the representations with 'batch-represent'.")
+        help="The input work directory containing 'reps.csv' and 'labels.csv'. Obtained from aligning a directory with 'align-dlib' and getting the representations with 'batch-represent'.",
+        default='../data/stars10mix/rep')
 
     inferParser = subparsers.add_parser(
         'infer', help='Predict who an image contains from a trained classifier.')
