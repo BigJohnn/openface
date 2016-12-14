@@ -11,6 +11,7 @@ import numpy as np
 import pickle
 import time
 import re
+import math
 from scipy import misc
 # from sklearn.pipeline import Pipeline
 # from sklearn.preprocessing import LabelEncoder
@@ -21,9 +22,18 @@ from sklearn.linear_model import LinearRegression
 # from sklearn.tree import DecisionTreeClassifier
 # from sklearn.naive_bayes import GaussianNB
 import operator
+import matplotlib.pyplot as plt
+from itertools import cycle
 
+from sklearn import svm, datasets
+from sklearn.metrics import roc_curve, auc
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import label_binarize
+from sklearn.multiclass import OneVsRestClassifier
+from scipy import interp
 
 import sys
+from sklearn.preprocessing import label_binarize
 sys.path.append("/home/hph/openface/util")
 
 import tensorflow as tf
@@ -184,6 +194,22 @@ def getRep(bgrImg, multiple=True):
     sreps = sorted(reps, key=lambda x: x[0])
     return sreps
 
+def getSingleRep(img):
+    bb = align.getLargestFaceBoundingBox(img)
+    if bb is None:
+        return None
+
+    alignedFace = align.align(
+        imgDim,
+        img,
+        bb,
+        landmarkIndices=openface.AlignDlib.OUTER_EYES_AND_NOSE)
+    # cv2.imshow("dfsd",alignedFace)
+    # cv2.waitKey()
+    rep = net.forward(alignedFace)
+    rep.reshape(-1, 1)
+    return rep
+
 class image():
     def __init__(self):
         self.src = []
@@ -290,8 +316,8 @@ class TestVideo(object):
                     dist = np.linalg.norm(rep - clf.means_[maxI])
                     print("  + Distance from the mean: {}".format(dist))
 
-                cv2.imshow("1", frame)
-                cv2.waitKey(1)
+                # cv2.imshow("1", frame)
+                # cv2.waitKey(1)
             wrt.write(frame_write)
             t02 = time.clock()
             # print (t02 - t01)
@@ -406,73 +432,280 @@ class TestVideo(object):
             print (t02 - t01)
 
     @classmethod
+    def predict_pn_draw_roc(cls, modeldir, posisampledir, negasampledir):
+        with open(modeldir, 'r') as f:
+            (le, clf) = pickle.load(f)
+
+        positive_clss = 'baby ch cqn dc fbb hg hjh lxr md wzl'
+
+        tpr = []
+        fpr = []
+        precision = []
+        accuracy = []
+        tp = np.zeros(10).tolist()
+        tn = np.zeros(10).tolist()
+        fp = np.zeros(10).tolist()
+        fn = np.zeros(10).tolist()
+
+        if os.path.exists(posisampledir):
+            for dir in os.listdir(posisampledir):
+                if re.search('\.', dir):
+                    continue
+
+                for item in os.listdir(os.path.join(posisampledir, dir)):
+                    img = cv2.imread(os.path.join(posisampledir, dir, item))
+                    # img = cv2.resize(img,(96,96))
+                    rep = getSingleRep(img)
+                    if rep == None:
+                        continue
+                    predictions = clf.predict_proba(rep).ravel()
+                    maxI = np.argmax(predictions)
+                    person = le.inverse_transform(maxI)
+                    confidence = predictions[maxI]
+
+                    for i,thresh in enumerate(range(10)):
+                        thresh = thresh / 10.0
+
+                        if confidence > thresh and re.search(person, positive_clss):
+                            tp[i] += 1
+                        else:
+                            fn[i] += 1
+        if os.path.exists(negasampledir):
+            for dir in os.listdir(negasampledir):
+                if re.search('\.', dir):
+                    continue
+
+                for item in os.listdir(os.path.join(negasampledir, dir)):
+                    img = cv2.imread(os.path.join(negasampledir, dir, item))
+                    rep = getSingleRep(img)
+                    if rep == None:
+                        continue
+                    predictions = clf.predict_proba(rep).ravel()
+                    maxI = np.argmax(predictions)
+                    person = le.inverse_transform(maxI)
+                    confidence = predictions[maxI]
+
+                    for i,thresh in enumerate(range(10)):
+                        thresh = thresh / 10.0
+                        if confidence > thresh and re.search(person, positive_clss):
+                            fp[i] += 1
+                        else:
+                            tn[i] += 1
+        print(tp, fn, fp, tn)
+        for i in range(10):
+            if tp[i] + fn[i] == 0:
+                tpr.append(0)
+            else:
+                tpr.append(float(tp[i]) / (float(tp[i]) + float(fn[i])))
+            if fp[i] + tn[i] == 0:
+                fpr.append(0)
+            else:
+                fpr.append(float(fp[i]) / (float(fp[i]) + float(tn[i])))
+
+            if tp[i] + fp[i] == 0:
+                precision.append(0)
+            else:
+                precision.append(float(tp[i]) / (float(tp[i]) + float(fp[i])))
+
+            accuracy.append(float(tp[i] + tn[i]) / float(tp[i] + tn[i] + fp[i] + fn[i]))
+
+
+        print('tpr:', tpr, 'fpr:', fpr, 'average precision:', sum(precision)/len(precision))
+
+        print('average accuracy:', sum(accuracy)/len(accuracy))
+        print('auc:', auc(fpr, tpr)/(fpr[9]-fpr[0]))
+        plt.plot(fpr, tpr)
+        plt.show()
+
+    @classmethod
     def predict_pn(cls, modeldir, posisampledir, negasampledir):
         with open(modeldir, 'r') as f:
             (le, clf) = pickle.load(f)
 
         positive_clss = 'baby ch cqn dc fbb hg hjh lxr md wzl'
-        # # thresh = 0.7
-        # tpr = []
+
         tpr = []
         fpr = []
-        accuracy = []
+        precision = []
         for thresh in range(10):
             thresh = thresh / 10.0
-            p = 0
-            n = 0
+
             tp = 0
             fp = 0
             tn = 0
             fn = 0
 
-            for dir in os.listdir(posisampledir):
-                if re.search('\.',dir):
-                    continue
-                p+=1
-                for item in os.listdir(os.path.join(posisampledir,dir)):
-                    img = cv2.imread(os.path.join(posisampledir,dir,item))
-                    rep = net.forward(img)
-                    rep.reshape(1,-1)
-                    predictions = clf.predict_proba(rep).ravel()
-                    maxI = np.argmax(predictions)
-                    person = le.inverse_transform(maxI)
-                    confidence = predictions[maxI]
+            if os.path.exists(posisampledir):
+                for dir in os.listdir(posisampledir):
+                    if re.search('\.',dir):
+                        continue
 
-                    if confidence>thresh and re.search(person,positive_clss):
-                        tp+=1
-                    else:
-                        fn+=1
-                print ('p:',p)
+                    for item in os.listdir(os.path.join(posisampledir,dir)):
+                        img = cv2.imread(os.path.join(posisampledir,dir,item))
+                        # img = cv2.resize(img,(96,96))
+                        rep = getSingleRep(img)
+                        if rep==None:
+                            continue
+                        predictions = clf.predict_proba(rep).ravel()
+                        maxI = np.argmax(predictions)
+                        person = le.inverse_transform(maxI)
+                        confidence = predictions[maxI]
 
-            for dir in os.listdir(negasampledir):
-                if re.search('\.',dir):
-                    continue
-                n+=1
-                for item in os.listdir(os.path.join(negasampledir,dir)):
-                    img = cv2.imread(os.path.join(negasampledir, dir, item))
-                    rep = net.forward(img)
-                    rep.reshape(-1,1)
-                    predictions = clf.predict_proba(rep).ravel()
-                    maxI = np.argmax(predictions)
-                    person = le.inverse_transform(maxI)
-                    confidence = predictions[maxI]
+                        if confidence>thresh and re.search(person,positive_clss):
+                            tp+=1
+                        else:
+                            fn+=1
 
-                    if confidence > thresh and re.search(person,positive_clss):
-                        fp += 1
-                    else:
-                        tn += 1
-                print ('n:',n)
-        tpr.append(tp/(tp+fn))
-        fpr.append(fp/(fp+tn))
-        accuracy.append((tp+tn)/(p+n))
+            if os.path.exists(negasampledir):
+                for dir in os.listdir(negasampledir):
+                    if re.search('\.',dir):
+                        continue
 
-        print ('tpr:',tpr,'fpr:',fpr,'accuracy:',accuracy)
+                    for item in os.listdir(os.path.join(negasampledir,dir)):
+                        img = cv2.imread(os.path.join(negasampledir, dir, item))
+                        rep = getSingleRep(img)
+                        if rep == None:
+                            continue
+                        predictions = clf.predict_proba(rep).ravel()
+                        maxI = np.argmax(predictions)
+                        person = le.inverse_transform(maxI)
+                        confidence = predictions[maxI]
 
+                        if confidence > thresh and re.search(person,positive_clss):
+                            fp += 1
+                        else:
+                            tn += 1
+            print (tp,fn,fp,tn)
+            if tp+fn ==0:
+                tpr.append(0)
+            else:
+                tpr.append(float(tp)/(float(tp)+float(fn)))
+            if fp+tn==0:
+                fpr.append(0)
+            else:
+                fpr.append(float(fp)/(float(fp)+float(tn)))
+
+            if tp+fp==0:
+                precision.append(0)
+            else:
+                precision.append(float(tp)/(float(tp)+float(fp)))
+
+        print ('tpr:',tpr,'fpr:',fpr,'precision:',precision)
+        print ('accuracy:',float(tp+tn)/float(tp+tn+fp+fn))
+        print('auc:', auc(fpr,tpr))
+        plt.plot(fpr,tpr)
+        plt.show()
+
+    @classmethod
+    def predict_pn2(cls, modeldir, testdir):
+        with open(modeldir, 'r') as f:
+            (le, clf) = pickle.load(f)
+        classes = os.listdir(testdir)
+        n_classes = len(classes)
+        y_test = []
+        y_score = []
+        for clss in classes:
+            test=[]
+            score = []
+            for iname in os.listdir(os.path.join(testdir,clss)):
+                img = cv2.imread(os.path.join(testdir, clss, iname))
+                img = cv2.resize(img, (96, 96))
+                rep = net.forward(img)
+                rep.reshape(-1, 1)
+                predictions = clf.predict_proba(rep).ravel()
+                maxI = np.argmax(predictions)
+                person = le.inverse_transform(maxI)
+                confidence = predictions[maxI]
+                test.append(person)
+                score.append(confidence)
+
+            y_test.append(test)
+            y_score.append(score)
+
+        fpr = dict()
+        tpr = dict()
+        th = dict()
+        roc_auc = dict()
+
+        pos_label = ['baby', 'ch', 'cqn', 'dc', 'fbb', 'hg', 'hjh', 'lxr', 'md', 'wzl']
+        for i in range(len(pos_label)):
+            fpr[i], tpr[i], th[i] = roc_curve(y_test[i],y_score[i],pos_label[i])
+            for iter,item in enumerate(tpr[i]):
+                if math.isnan(item):
+                    tpr[i][iter]=0
+            roc_auc[i] = auc(fpr[i],tpr[i])
+
+        print ('fpr:',fpr,'tpr:',tpr,'th:',th)
+        lw=2 #line width -.-
+        # Compute macro-average ROC curve and ROC area
+
+        # First aggregate all false positive rates
+        all_fpr = np.unique(np.concatenate([fpr[i] for i in range(len(pos_label))]))
+
+        # Then interpolate all ROC curves at this points
+        mean_tpr = np.zeros_like(all_fpr)
+        for i in range(len(pos_label)):
+            mean_tpr += interp(all_fpr, fpr[i], tpr[i])
+
+        # Finally average it and compute AUC
+        mean_tpr /= n_classes
+
+        print (all_fpr,mean_tpr)
+        fpr["macro"] = all_fpr
+        tpr["macro"] = mean_tpr
+        roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
+
+        # Plot all ROC curves
+        plt.figure()
+        plt.plot(fpr["micro"], tpr["micro"],
+                 label='micro-average ROC curve (area = {0:0.2f})'
+                       ''.format(roc_auc["micro"]),
+                 color='deeppink', linestyle=':', linewidth=4)
+
+        plt.plot(fpr["macro"], tpr["macro"],
+                 label='macro-average ROC curve (area = {0:0.2f})'
+                       ''.format(roc_auc["macro"]),
+                 color='navy', linestyle=':', linewidth=4)
+
+        colors = cycle(['aqua', 'darkorange', 'cornflowerblue'])
+        for i, color in zip(range(n_classes), colors):
+            plt.plot(fpr[i], tpr[i], color=color, lw=lw,
+                     label='ROC curve of class {0} (area = {1:0.2f})'
+                           ''.format(i, roc_auc[i]))
+
+        plt.plot([0, 1], [0, 1], 'k--', lw=lw)
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Some extension of Receiver operating characteristic to multi-class')
+        plt.legend(loc="lower right")
+        plt.show()
 
 if __name__ == '__main__':
-    # TestVideo.test_predict_video(video_name='../data/bpb150515.flv', modeldir='../data/stars10mix/rep/classifierLinearSvm23a900.pkl',compress_ratio=0.6)
+    # TestVideo.test_predict_video(video_name='../data/bpb150515.flv', modeldir='/system2/data/faces/mix/rep/classifierLinearSvm.pkl',compress_ratio=1.0)
+    # tpr = [0.9840142095914742, 0.9769094138543517, 0.9662522202486679, 0.9520426287744227, 0.91651865008881, 0.8703374777975134, 0.8330373001776199, 0.7655417406749556, 0.6820603907637656, 0.5825932504440497]
+    # fpr = [0.7498549042367962, 0.698200812536274, 0.6302959953569356, 0.5612304120719674, 0.5107370864770748, 0.4312246082414393, 0.3569355774811376, 0.277423099245502, 0.21358096343586766, 0.12884503772489844]
+    # tpr=[0.783303730017762, 0.783303730017762, 0.7779751332149201, 0.7335701598579041, 0.7015985790408525, 0.6376554174067496, 0.5488454706927176, 0.458259325044405, 0.35701598579040855, 0.20426287744227353]
+    # fpr = [0.07312826465467208, 0.07312826465467208, 0.07080673244341265, 0.0591990713871155, 0.04468949506674405, 0.03366221706326175, 0.019733023795705164, 0.013348810214741729, 0.008705745792222866, 0.0023215322112594312]
+    # roc_auc = auc(tpr, fpr)
+    # plt.plot(fpr, tpr)
+    # plt.show()
+    # auc = 0.0435436766596
+    # fpr_min = 0.0023215322112594312
+    # fpr_max = 0.07312826465467208
+    # auc = auc/(fpr_max-fpr_min)
+    # print (auc)
+    # TestVideo.predict_pn_draw_roc('/system2/data/faces/mix/rep/classifierLinearSvm.pkl','/system2/data/faces/pos/test','/system2/data/faces/neg/test')
+    TestVideo.predict_pn_draw_roc('../data/stars10mix/rep/classifierLinearSvm23a900.pkl','/system2/data/faces/pos/test','/system2/data/faces/neg/test')
 
-    TestVideo.predict_pn('../data/stars10mix/rep/classifierLinearSvm23a900.pkl','../data/stars10-600/aligned','../aligned-11-16')
+    # TestVideo.predict_pn2('/system2/data/faces/mix/rep/classifierLinearSvm.pkl', '/system2/data/faces/mix/test')
+    # y = ['baby', 'ch','cqn','dc','fbb','hg','hjh','lxr','md','wzl']
+    # y = np.array(y)
+    # print (y)
+    # y = label_binarize(['baby','ch'],classes=y)
+    # print (y)
+    # print (y.shape[1])
     # I = cv2.imread('../data/stars10/singles/baby.jpg')
     #
     # x = 'dsds'
