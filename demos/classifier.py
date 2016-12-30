@@ -110,6 +110,7 @@ def train(args):
     embeddings = pd.read_csv(fname, header=None).as_matrix()
     le = LabelEncoder().fit(labels)
     labelsNum = le.transform(labels)
+    print ('le:',le.classes_.shape,'emb:',embeddings.shape,'labels:',len(labels))
     nClasses = len(le.classes_)
     print("Training for {} classes.".format(nClasses))
 

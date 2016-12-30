@@ -40,24 +40,24 @@ modelDir = os.path.join(fileDir, '..', 'models')
 openfaceModelDir = os.path.join(modelDir, 'openface')
 
 
-def main():
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument('--networkModel', type=str, help="Path to Torch network model.",
-                        default=os.path.join(openfaceModelDir, 'nn4.small2.v1.t7'))
-    parser.add_argument('--imgDim', type=int,
-                        help="Default image dimension.", default=96)
-    parser.add_argument('--cuda', action='store_true')
-    parser.add_argument('--threshold', type=float, default=0.9)
-    parser.add_argument('--delete', action='store_true', help='Delete the outliers.')
-    parser.add_argument('directory')
-
-    args = parser.parse_args()
+def main(args):
+    # parser = argparse.ArgumentParser()
+    #
+    # parser.add_argument('--networkModel', type=str, help="Path to Torch network model.",
+    #                     default=os.path.join(openfaceModelDir, 'nn4.v2.t7'))
+    # parser.add_argument('--imgDim', type=int,
+    #                     help="Default image dimension.", default=96)
+    # parser.add_argument('--cuda', action='store_true')
+    # parser.add_argument('--threshold', type=float, default=0.9)
+    # parser.add_argument('--delete', action='store_true', help='Delete the outliers.')
+    # parser.add_argument('directory',default='../data/stars10/singles')
+    #
+    # args = parser.parse_args()
 
     net = openface.TorchNeuralNet(args.networkModel, args.imgDim, cuda=args.cuda)
 
     reps = []
-    paths = sorted(list(glob.glob(os.path.join(args.directory, '*.png'))))
+    paths = sorted(list(glob.glob(os.path.join(args.directory, '*.*'))))
     print("=== {} ===".format(args.directory))
     for imgPath in paths:
         if cv2.imread(imgPath) is None:
@@ -66,7 +66,7 @@ def main():
                 # Remove the file if it's not a valid image.
                 os.remove(imgPath)
         else:
-            reps.append(net.forwardPath(imgPath))
+            reps.append(net.forwardPath(cv2.imread(imgPath)))
 
     mean = np.mean(reps, axis=0)
     dists = euclidean_distances(reps, mean)
@@ -83,4 +83,9 @@ def main():
             os.remove(path)
 
 if __name__ == '__main__':
-    main()
+    main(argparse.Namespace(networkModel='nn4.v2.t7',
+                            imgDim=96,
+                            cuda=True,
+                            delete=False,
+                            threshold=0.9,
+                            directory='../data/stars10/singles'))
