@@ -94,7 +94,6 @@ COLOUR_CORRECT_BLUR_FRAC = 0.6
 LEFT_EYE_POINTS = list(range(42, 48))
 RIGHT_EYE_POINTS = list(range(36, 42))
 
-
 def warp_im(im, M, dshape):
     output_im = np.zeros(dshape, dtype=im.dtype)
     cv2.warpAffine(im,
