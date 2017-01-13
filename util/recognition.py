@@ -34,7 +34,7 @@ from scipy import interp
 
 import sys
 from sklearn.preprocessing import label_binarize
-sys.path.append("/home/hph/openface/util")
+sys.path.append("/system3/home/hph/openface/util")
 
 import tensorflow as tf
 import detect_face
@@ -42,7 +42,7 @@ import dlib
 start = time.time()
 
 detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor('/home/hph/openface/models/dlib/shape_predictor_68_face_landmarks.dat')
+predictor = dlib.shape_predictor('/system3/home/hph/openface/models/dlib/shape_predictor_68_face_landmarks.dat')
 def get_landmarks(im):
     rects = detector(im, 1)
 
@@ -165,7 +165,7 @@ class Compare(object):
         with tf.Graph().as_default():
             gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=self.gpu_memory_fraction,allow_growth = True)
             sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options,
-                                                    log_device_placement=False,
+                                                    log_device_placement=True,
                                                     allow_soft_placement=True
                                                     ))
             with sess.as_default():
@@ -276,7 +276,7 @@ class Compare(object):
             ckpt_file = sorted_iter[-1][0]
         return meta_file, ckpt_file
 
-align = openface.AlignDlib('/home/hph/openface/models/dlib/shape_predictor_68_face_landmarks.dat')
+align = openface.AlignDlib('/system3/home/hph/openface/models/dlib/shape_predictor_68_face_landmarks.dat')
 net = openface.TorchNeuralNet('../models/nn4.v2.t7', 96, cuda=False)
 
 imgDim = 96
@@ -327,9 +327,9 @@ def getSingleRep(img):
     rep.reshape(-1, 1)
     return rep
 
-class image():
+class Emb():
     def __init__(self):
-        self.src = []
+        self.data = []
         self.name = ''
         self.dist = 10000.0
 
@@ -399,7 +399,7 @@ class TestVideo(object):
                 person = le.inverse_transform(maxI)
                 confidence = predictions[maxI]
 
-                thresh = 0.7
+                thresh = 0.5
                 if confidence<thresh:
                     cv2.rectangle(frame, (l, t), (r, d), color=(255, 255, 0), thickness=4)
                     cv2.rectangle(frame_write, (int(l / compress_ratio), int(t / compress_ratio)),
@@ -440,35 +440,54 @@ class TestVideo(object):
             # print (t02 - t01)
 
     @classmethod
-    def cmp_predict_video(cls, video_name, cmp, canonical_imgs, compress_ratio=0.9, multiple=True):
+    def cmp_predict_video(cls, video_name, cmp, embs, compress_ratio=0.9, multiple=True):
         cap = cv2.VideoCapture()
         cap.open(video_name)
 
-        # width = cap.get(0)
-        # height = cap.get(1)
-        width = 480
-        height = 360
-        # print video_name[:-4]
+        # width = 480
+        # height = 360
+        width = 1104
+        height = 622
+        width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+        height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        print (video_name[:-4])
         wrt = cv2.VideoWriter(video_name[:-4] + "_pred.avi", cv2.VideoWriter_fourcc(*'XVID'), 20,
-                              (width, height))  # image size must == (width, height)
+                              (int(width), int(height)))
 
-        init_imagelist = [item.src for item in canonical_imgs]
-        start = time.clock()
-        images = cmp.load_and_align_data(init_imagelist)
-
-        for iter in iters:
-            canonical_imgs.remove(canonical_imgs[iter])
-
-        feed_dict = {cmp.images_placeholder: images}
+        # init_imagelist = [item.src for item in canonical_imgs]
+        # images = cmp.load_and_align_data(init_imagelist)
+        #
+        # for iter in iters:
+        #     canonical_imgs.remove(canonical_imgs[iter])
+        #
+        # feed_dict = {cmp.images_placeholder: images}
+        # emb = cmp.sess_feature.run(cmp.embeddings, feed_dict=feed_dict)
 
         t03 = time.clock()
-        emb = cmp.sess_feature.run(cmp.embeddings, feed_dict=feed_dict)
-        labels = [item.name for item in canonical_imgs]
+
+        labels = []
+        embmix=None
+
+        flag = True
+        for emb in embs:
+            if flag is True:
+                embmix = emb.data
+                flag = False
+            else:
+                embmix = np.vstack(embmix,emb.data)
+
+            for i in range(np.shape(emb.data)[0]):
+                labels.append(emb.name)
+
+
+        # labels = [item.name for item in canonical_imgs]
         le = LabelEncoder().fit(labels)
         labelsNum = le.transform(labels)
         clf = SVC(C=1, kernel='linear', probability=True)
-        clf.fit(emb, labelsNum)
+        clf.fit(embmix, labelsNum)
 
+        print (np.shape(embmix))
+        print ('LabelsNum:',labelsNum)
         t04 = time.clock()
         print("extract feature time: %fs" % (t04 - t03))
 
@@ -561,7 +580,6 @@ class TestVideo(object):
                                 (bb.center().x, bb.center().y), \
                                 cv2.FONT_HERSHEY_PLAIN, 1.1, (255, 0, 0), 2)
                     cv2.putText(frame_write, "unknow.".format(person, confidence),
-
                                 (int(bb.center().x / compress_ratio), int(bb.center().y / compress_ratio)), \
                                 cv2.FONT_HERSHEY_PLAIN, 1.1 / (1 + compress_ratio), (255, 0, 0),
                                 int(2 / (1 + compress_ratio)))
@@ -866,22 +884,32 @@ if __name__ == '__main__':
     # auc = auc/(fpr_max-fpr_min)
     # print (auc)
     # TestVideo.predict_pn_draw_roc('/system2/data/faces/mix/rep/classifierLinearSvm.pkl','/system2/data/faces/pos/test','/system2/data/faces/neg/test')
-    TestVideo.predict_pn_draw_roc('../data/stars10mix/rep/LinearSvm.pkl','/system2/data/faces/pos/test','/system2/data/faces/neg/test')
+    # TestVideo.predict_pn_draw_roc('../data/stars10mix/rep/LinearSvm.pkl','/system2/data/faces/pos/test','/system2/data/faces/neg/test')
 
     # TestVideo.predict_pn2('/system2/data/faces/mix/rep/classifierLinearSvm.pkl', '/system2/data/faces/mix/test')
 
-    # images = []
-    # pref = '../data/stars10-600/raw'
-    # for dir in os.listdir(pref):
-    #     for item in os.listdir(os.path.join(pref,dir)):
-    #         im = image()
-    #         im.src = cv2.imread(os.path.join(pref, dir,item))
-    #         im.name = dir
-    #         # print (im.name)
-    #         images.append(im)
-    #
-    # start = time.clock()
-    # cp = Compare('/home/hph/Facenet/facenet/models/20161216-095311', image_size=160, margin=44, gpu_memory_fraction=1.0)
-    # end = time.clock()
-    # print('init time', end - start, 's')
-    # TestVideo.cmp_predict_video(video_name='../data/xiaoao1501.avi', cmp = cp, canonical_imgs=images, multiple=True)
+    start = time.clock()
+    cp = Compare('/system3/home/hph/Facenet/facenet/models/20161216-095311', image_size=160, margin=44, gpu_memory_fraction=0.8)
+    end = time.clock()
+    print('init time', end - start, 's')
+
+    embs = []
+    pref = '../data/select'
+    for dir in os.listdir(pref):
+        e=Emb()
+        single_actor_images=[]
+        for item in os.listdir(os.path.join(pref, dir)):
+            I = cv2.imread(os.path.join(pref, dir, item))
+            if I is None:
+                continue
+            single_actor_images.append(I)
+
+        single_actor_images_aligned = cp.load_and_align_data(single_actor_images)
+
+        fd = {cp.images_placeholder: single_actor_images_aligned}
+
+        e.data = cp.sess_feature.run(cp.embeddings, feed_dict=fd)
+
+        e.name = dir
+        embs.append(e)
+    TestVideo.cmp_predict_video(video_name='../data/baby.mp4', cmp = cp, embs=embs, multiple=True)
