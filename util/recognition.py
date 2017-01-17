@@ -233,7 +233,12 @@ class Compare(object):
             print ("Exception occured!")
             pass
 
-        images = np.stack(img_list)
+        # print (img_list)
+
+        try:
+            images = np.stack(img_list)
+        except:
+            return None
         # t02 = time.clock()
         # print("align time for 2 images: %fs" % (t02-t01))
         return images
@@ -329,9 +334,9 @@ def getSingleRep(img):
 
 class Emb():
     def __init__(self):
-        self.data = []
+        self.data = np.array([])
         self.name = ''
-        self.dist = 10000.0
+        # self.dist = 10000.0
 
 class TestVideo(object):
     @classmethod
@@ -353,7 +358,7 @@ class TestVideo(object):
 
             ret, frame = cap.read()
             if frame is None:
-                break
+                continue
             frame_write = copy.deepcopy(frame)
             frame = cv2.resize(frame, (int(width*compress_ratio), int(height*compress_ratio)))
 
@@ -443,9 +448,8 @@ class TestVideo(object):
     def cmp_predict_video(cls, video_name, cmp, embs, compress_ratio=0.9, multiple=True):
         cap = cv2.VideoCapture()
         cap.open(video_name)
-
-        # width = 480
-        # height = 360
+        if cap is None:
+            print ('Error read video!')
         width = 1104
         height = 622
         width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
@@ -453,15 +457,6 @@ class TestVideo(object):
         print (video_name[:-4])
         wrt = cv2.VideoWriter(video_name[:-4] + "_pred.avi", cv2.VideoWriter_fourcc(*'XVID'), 20,
                               (int(width), int(height)))
-
-        # init_imagelist = [item.src for item in canonical_imgs]
-        # images = cmp.load_and_align_data(init_imagelist)
-        #
-        # for iter in iters:
-        #     canonical_imgs.remove(canonical_imgs[iter])
-        #
-        # feed_dict = {cmp.images_placeholder: images}
-        # emb = cmp.sess_feature.run(cmp.embeddings, feed_dict=feed_dict)
 
         t03 = time.clock()
 
@@ -474,13 +469,11 @@ class TestVideo(object):
                 embmix = emb.data
                 flag = False
             else:
-                embmix = np.vstack(embmix,emb.data)
+                embmix = np.vstack((embmix,emb.data))
 
             for i in range(np.shape(emb.data)[0]):
                 labels.append(emb.name)
 
-
-        # labels = [item.name for item in canonical_imgs]
         le = LabelEncoder().fit(labels)
         labelsNum = le.transform(labels)
         clf = SVC(C=1, kernel='linear', probability=True)
@@ -488,13 +481,15 @@ class TestVideo(object):
 
         print (np.shape(embmix))
         print ('LabelsNum:',labelsNum)
+        print ('labels',labels)
         t04 = time.clock()
         print("extract feature time: %fs" % (t04 - t03))
 
         while cap.isOpened():
             ret, frame = cap.read()
             if frame is None:
-                break
+                print ('frame is None')
+                continue
             frame_write = copy.deepcopy(frame)
             frame = cv2.resize(frame, (int(width * compress_ratio), int(height * compress_ratio)))
 
@@ -502,9 +497,9 @@ class TestVideo(object):
             if len(reps) > 1:
                 print("List of faces in image from left to right")
             t01 = time.clock()
-            for r in reps:
+            for rep in reps:
                 # rep = r[1].reshape(1, -1)
-                bb = r[0]
+                bb = rep[0]
 
                 if bb.left() < 0:
                     l = 0
@@ -538,8 +533,8 @@ class TestVideo(object):
                     print (l,r,t,d)
                     continue
                 roi = cv2.resize(roi,(imgDim,imgDim))
-                cv2.imshow('roi', roi)
-                cv2.waitKey(1)
+                # cv2.imshow('roi', roi)
+                # cv2.waitKey(1)
 
                 I = []
                 I.append(roi)
@@ -549,22 +544,28 @@ class TestVideo(object):
                 fd = {cmp.images_placeholder: i}
 
                 embv = cmp.sess_feature.run(cmp.embeddings, feed_dict=fd)
-                
-                predictions = clf.predict_proba(embv[0, :]).ravel()
-                maxI = np.argmax(predictions)
-                person = le.inverse_transform(maxI)
-                confidence = predictions[maxI]
+                # print ('embv.shape',embv.shape)
+                predictions = clf.predict_proba(embv).ravel()
+                asorted = np.argsort(-predictions)
+                # top3 = dict()
+                # top3[labelsNum[asorted[0]]]=predictions[asorted[0]]
+                #
+                # print('asorted', asorted)
+                # for i in range(0,3):
+                #     if labelsNum[asorted[i]] in top3:
+                #         top3[labelsNum[asorted[i]]] = (top3[labelsNum[asorted[i]]] + predictions[asorted[i]])/2
+                #     else:
+                #         top3[labelsNum[asorted[i]]] = predictions[asorted[i]]
+                #
+                # lis = sorted(top3.items(),key=lambda d:d[1])#sorted from small to large
+                # maxI = np.argmax(predictions)
+                target = asorted[0]
+                person = le.inverse_transform(target)
+                # confidence = predictions[maxI]
+                confidence = predictions[asorted[0]]
 
-                # cmpfun = operator.attrgetter('dist') # sort by dist
-                # canonical_imgs.sort(key=cmpfun)
-                # 
-                # for img in canonical_imgs:
-                #     print (img.name,':',img.dist)
-                # confidence = canonical_imgs[0].dist
-                # person = canonical_imgs[0].name
-
-                thresh = 0.8
-                if confidence < thresh:
+                thresh = 0.5
+                if confidence > thresh:
                     cv2.rectangle(frame, (l, t), (r, d), color=(255, 255, 0), thickness=4)
                     cv2.rectangle(frame_write, (int(l / compress_ratio), int(t / compress_ratio)),
                                   (int(r / compress_ratio), int(d / compress_ratio)),
@@ -574,30 +575,33 @@ class TestVideo(object):
                     cv2.rectangle(frame_write, (int(l / compress_ratio), int(t / compress_ratio)),
                                   (int(r / compress_ratio), int(d / compress_ratio)),
                                   color=(0, 0, 0), thickness=4)
-                print("Predict {} @ x={} with {:.2f} confidence.".format(person, bb, confidence))
-                if confidence > thresh:
+                print("Predict {} @ x={} with {:.2f} distance.".format(person, bb, confidence))
+
+                fontScale = float(width/500.0+0.1)
+                thickness = int(fontScale)
+                if confidence < thresh:
                     cv2.putText(frame, "unknow.".format(person, confidence),
                                 (bb.center().x, bb.center().y), \
-                                cv2.FONT_HERSHEY_PLAIN, 1.1, (255, 0, 0), 2)
+                                cv2.FONT_HERSHEY_PLAIN, fontScale, (255, 0, 0), thickness)
                     cv2.putText(frame_write, "unknow.".format(person, confidence),
                                 (int(bb.center().x / compress_ratio), int(bb.center().y / compress_ratio)), \
-                                cv2.FONT_HERSHEY_PLAIN, 1.1 / (1 + compress_ratio), (255, 0, 0),
-                                int(2 / (1 + compress_ratio)))
+                                cv2.FONT_HERSHEY_PLAIN, fontScale / (1 + compress_ratio), (255, 0, 0),
+                                thickness)
                 else:
-                    cv2.putText(frame, "{} @  {:.2f} confidence.".format(person, confidence),
+                    cv2.putText(frame, "{} @  {:.2f} distance.".format(person, confidence),
                                 (bb.center().x, bb.center().y), \
-                                cv2.FONT_HERSHEY_PLAIN, 1.1, (0, 255, 255), 2)
-                    cv2.putText(frame_write, "{} @  {:.2f} confidence.".format(person, confidence),
+                                cv2.FONT_HERSHEY_PLAIN, fontScale, (0, 255, 255), thickness)
+                    cv2.putText(frame_write, "{} @  {:.2f} distance.".format(person, confidence),
                                 (int(bb.center().x / compress_ratio), int(bb.center().y / compress_ratio)), \
-                                cv2.FONT_HERSHEY_PLAIN, 1.1 / (1 + compress_ratio), (0, 255, 255),
-                                int(2 / (1 + compress_ratio)))
+                                cv2.FONT_HERSHEY_PLAIN, fontScale / (1 + compress_ratio), (0, 255, 255),
+                                thickness)
 
-                cv2.imshow("1", frame)
-                cv2.waitKey(1)
+            # cv2.imshow("1", frame)
+            # cv2.waitKey(1)
 
             wrt.write(frame_write)
             t02 = time.clock()
-            print (t02 - t01)
+            # print (t02 - t01)
 
     @classmethod
     def predict_pn_draw_roc(cls, modeldir, posisampledir, negasampledir):
@@ -889,7 +893,7 @@ if __name__ == '__main__':
     # TestVideo.predict_pn2('/system2/data/faces/mix/rep/classifierLinearSvm.pkl', '/system2/data/faces/mix/test')
 
     start = time.clock()
-    cp = Compare('/system3/home/hph/Facenet/facenet/models/20161216-095311', image_size=160, margin=44, gpu_memory_fraction=0.8)
+    cp = Compare('/system3/home/hph/Facenet/facenet/models/20161216-095311', image_size=160, margin=44, gpu_memory_fraction=1.0)
     end = time.clock()
     print('init time', end - start, 's')
 
@@ -912,4 +916,4 @@ if __name__ == '__main__':
 
         e.name = dir
         embs.append(e)
-    TestVideo.cmp_predict_video(video_name='../data/baby.mp4', cmp = cp, embs=embs, multiple=True)
+    TestVideo.cmp_predict_video(video_name='../data/baby.avi', cmp = cp, embs=embs, multiple=True)
