@@ -13,6 +13,7 @@ import time
 import re
 import math
 from scipy import misc
+import time
 # from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 from sklearn.svm import SVC
@@ -31,6 +32,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import label_binarize
 from sklearn.multiclass import OneVsRestClassifier
 from scipy import interp
+
 
 import sys
 from sklearn.preprocessing import label_binarize
@@ -165,7 +167,7 @@ class Compare(object):
         with tf.Graph().as_default():
             gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=self.gpu_memory_fraction,allow_growth = True)
             sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options,
-                                                    log_device_placement=True,
+                                                    log_device_placement=False,
                                                     allow_soft_placement=True
                                                     ))
             with sess.as_default():
@@ -198,9 +200,11 @@ class Compare(object):
             # img_size=init_images[i].size
             img_size = np.asarray(init_images[i].shape)[0:2]
             # print (img_size)
+            start=time.time()
             bounding_boxes, _ = detect_face.detect_face(init_images[i], minsize,
                                                         self.__pnet, self.__rnet, self.__onet,
                                                         threshold, factor)
+            print (time.time()-start)
             # print (bounding_boxes.shape)
             if np.size(bounding_boxes) == 0:
                 print ("Can't detect face!",i)
@@ -450,8 +454,7 @@ class TestVideo(object):
         cap.open(video_name)
         if cap is None:
             print ('Error read video!')
-        width = 1104
-        height = 622
+
         width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
         print (video_name[:-4])
@@ -489,7 +492,7 @@ class TestVideo(object):
             ret, frame = cap.read()
             if frame is None:
                 print ('frame is None')
-                continue
+                break
             frame_write = copy.deepcopy(frame)
             frame = cv2.resize(frame, (int(width * compress_ratio), int(height * compress_ratio)))
 
@@ -564,7 +567,8 @@ class TestVideo(object):
                 # confidence = predictions[maxI]
                 confidence = predictions[asorted[0]]
 
-                thresh = 0.5
+                confidence = (confidence - predictions[asorted[1]])/confidence
+                thresh = 0.3
                 if confidence > thresh:
                     cv2.rectangle(frame, (l, t), (r, d), color=(255, 255, 0), thickness=4)
                     cv2.rectangle(frame_write, (int(l / compress_ratio), int(t / compress_ratio)),
@@ -575,7 +579,7 @@ class TestVideo(object):
                     cv2.rectangle(frame_write, (int(l / compress_ratio), int(t / compress_ratio)),
                                   (int(r / compress_ratio), int(d / compress_ratio)),
                                   color=(0, 0, 0), thickness=4)
-                print("Predict {} @ x={} with {:.2f} distance.".format(person, bb, confidence))
+                print("Predict {} @ x={} with {:.2f} confidence.".format(person, bb, confidence))
 
                 fontScale = float(width/500.0+0.1)
                 thickness = int(fontScale)
@@ -588,10 +592,10 @@ class TestVideo(object):
                                 cv2.FONT_HERSHEY_PLAIN, fontScale / (1 + compress_ratio), (255, 0, 0),
                                 thickness)
                 else:
-                    cv2.putText(frame, "{} @  {:.2f} distance.".format(person, confidence),
+                    cv2.putText(frame, "{} @  {:.2f} confidence.".format(person, confidence),
                                 (bb.center().x, bb.center().y), \
                                 cv2.FONT_HERSHEY_PLAIN, fontScale, (0, 255, 255), thickness)
-                    cv2.putText(frame_write, "{} @  {:.2f} distance.".format(person, confidence),
+                    cv2.putText(frame_write, "{} @  {:.2f} confidence.".format(person, confidence),
                                 (int(bb.center().x / compress_ratio), int(bb.center().y / compress_ratio)), \
                                 cv2.FONT_HERSHEY_PLAIN, fontScale / (1 + compress_ratio), (0, 255, 255),
                                 thickness)

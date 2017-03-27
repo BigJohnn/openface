@@ -182,6 +182,7 @@ class AlignDlib:
         npLandmarks = np.float32(landmarks)
         npLandmarkIndices = np.array(landmarkIndices)
 
+        print(npLandmarks[npLandmarkIndices],imgDim * MINMAX_TEMPLATE[npLandmarkIndices])
         H = cv2.getAffineTransform(npLandmarks[npLandmarkIndices],
                                    imgDim * MINMAX_TEMPLATE[npLandmarkIndices])
         thumbnail = cv2.warpAffine(rgbImg, H, (imgDim, imgDim))
